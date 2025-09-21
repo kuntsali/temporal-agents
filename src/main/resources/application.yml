@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: temporal-agents
+  ai:
+    openai:
+      api-key: ${LLM_KEY:}
+      base-url: ${LLM_BASE_URL:}
+      chat:
+        options:
+          model: ${LLM_MODEL:gpt-4o-mini}
+          temperature: 0.2
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+agent:
+  show-tool-args-confirmation-default: true
+  max-turns-before-continue: 250
+
+temporal:
+  address: ${TEMPORAL_ADDRESS:localhost:7233}
+  namespace: ${TEMPORAL_NAMESPACE:default}
+  task-queue: ${TEMPORAL_TASK_QUEUE:agent-task-queue}
