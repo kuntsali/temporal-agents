@@ -22,6 +22,7 @@ import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.ChatClient.Builder;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -36,8 +37,8 @@ public class ToolActivitiesImpl implements ToolActivities {
     private final ToolRegistry toolRegistry;
     private final ObjectMapper objectMapper;
 
-    public ToolActivitiesImpl(ChatClient chatClient, ToolRegistry toolRegistry, ObjectMapper objectMapper) {
-        this.chatClient = chatClient;
+    public ToolActivitiesImpl(Builder chatClientBuilder, ToolRegistry toolRegistry, ObjectMapper objectMapper) {
+        this.chatClient = chatClientBuilder.build();
         this.toolRegistry = toolRegistry;
         this.objectMapper = objectMapper;
     }
