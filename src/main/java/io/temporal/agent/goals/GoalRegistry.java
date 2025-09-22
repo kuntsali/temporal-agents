@@ -19,10 +19,13 @@ public class GoalRegistry {
         register(buildEcommerceOrderStatus(toolRegistry));
         register(buildEcommerceListOrders(toolRegistry));
         register(buildAgentSelectionGoal(toolRegistry));
+        register(buildPandadocAutomationGoal(toolRegistry));
     }
 
     private void register(AgentGoal goal) {
-        goalsById.put(goal.getId(), goal);
+        if (goal != null) {
+            goalsById.put(goal.getId(), goal);
+        }
     }
 
     public List<AgentGoal> listGoals() {
@@ -90,6 +93,35 @@ public class GoalRegistry {
                 "user: I want help tracking an order",
                 "agent: Great! I can connect you with the order tracking agent. Does that sound good?"));
         goal.setTools(Collections.emptyList());
+        return goal;
+    }
+
+    private AgentGoal buildPandadocAutomationGoal(ToolRegistry toolRegistry) {
+        ToolDefinition listTemplates = cloneDefinition(toolRegistry.get("ListPandadocTemplates"));
+        ToolDefinition createDocument = cloneDefinition(toolRegistry.get("CreatePandadocDocument"));
+        ToolDefinition sendDocument = cloneDefinition(toolRegistry.get("SendPandadocDocument"));
+        ToolDefinition getStatus = cloneDefinition(toolRegistry.get("GetPandadocDocumentStatus"));
+        if (listTemplates == null || createDocument == null || sendDocument == null || getStatus == null) {
+            return null;
+        }
+        AgentGoal goal = new AgentGoal();
+        goal.setId("goal_pandadoc_automation");
+        goal.setCategoryTag("documents");
+        goal.setAgentName("PandaDoc Agreement Automation");
+        goal.setAgentFriendlyDescription("Prepare, send, and track PandaDoc agreements end-to-end.");
+        goal.setDescription(String.join(" ",
+                "Guide the user through choosing a PandaDoc template, collecting signer details,",
+                "filling required token values, creating the document draft, sending it for signature,",
+                "and monitoring status until it is completed. Always list templates so the user can",
+                "confirm the correct template name or ID before creating a document."));
+        goal.setStarterPrompt("Introduce yourself as a PandaDoc assistant, offer to list templates, and gather the request details.");
+        goal.setExampleConversationHistory(String.join("\n",
+                "user: Can you create an NDA for Acme?",
+                "agent: Absolutely. Here are the PandaDoc templates I can use: ... Which one should we start with?",
+                "user: Use the Mutual NDA template and send it to John Doe john@example.com.",
+                "agent: Great! I'll create the document draft now and send it for signature once it's ready."));
+        List<ToolDefinition> tools = List.of(listTemplates, createDocument, sendDocument, getStatus);
+        goal.setTools(tools);
         return goal;
     }
 

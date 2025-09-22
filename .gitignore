@@ -3,6 +3,7 @@ target/
 build/
 site/
 assets/
+!src/main/resources/static/assets/
 
 .gradle
 !gradle/wrapper/gradle-wrapper.jar

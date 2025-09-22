@@ -6,7 +6,7 @@ This project reimagines the [Temporal AI Agent](https://github.com/temporal-comm
 
 - **Temporal Workflow Loop** – a long-lived workflow (`AgentGoalWorkflow`) that listens for user prompts, asks an LLM for the next step, and executes tools with confirmation gates.
 - **Spring AI Integration** – the planning and validation activities delegate to any OpenAI-compatible model configured through Spring AI.
-- **Extensible Tools** – business tools are registered with a Spring managed `ToolRegistry`. The example implementation mirrors the ecommerce scenario from the original demo (listing orders, checking order status, tracking shipments).
+- **Extensible Tools** – business tools are registered with a Spring managed `ToolRegistry`. The demo includes ecommerce utilities (list orders, check status, track packages) and PandaDoc automation helpers for creating and tracking documents.
 - **Goal Catalog** – goals are defined via the `GoalRegistry`, including an agent-selection goal and ecommerce flows.
 - **REST API** – `AgentController` exposes endpoints to start conversations, submit prompts, confirm tool runs, switch goals, and inspect state.
 - **Test Coverage** – unit and end-to-end tests validate the tool catalog, goal registry, prompt generation, and workflow loop.
@@ -48,7 +48,7 @@ All configuration lives in `src/main/resources/application.yml` and environment 
    ./gradlew bootRun
    ```
 
-The worker registers the workflow and activities and begins polling the configured task queue. The REST API is available on `http://localhost:8080`.
+The worker registers the workflow and activities and begins polling the configured task queue. The REST API is available on `http://localhost:8080` and the chat UI is served from the same port.
 
 ### API Overview
 
@@ -62,6 +62,20 @@ The worker registers the workflow and activities and begins polling the configur
 | `GET /api/agent/{workflowId}/history` | Retrieve the deterministic conversation log. |
 | `GET /api/agent/{workflowId}/tool` | Retrieve the latest tool planning response. |
 | `GET /api/agent/goals` | List available goals with metadata. |
+| `GET /api/pandadoc/templates` | List PandaDoc templates (accepts optional `search` query). |
+
+### Browser Chat UI
+
+Navigate to `http://localhost:8080/` once the application is running to launch the built-in chat experience. The interface mirrors familiar chat assistants with:
+
+- **Goal selection** – choose any registered agent goal before starting a workflow or change goals mid-conversation.
+- **Template explorer** – browse PandaDoc templates (with optional search) to understand the available document skeletons.
+- **Conversation feed** – review every user/agent/tool message captured by the Temporal workflow.
+- **Tool confirmation** – inspect pending tool arguments and approve executions directly from the UI.
+
+The client communicates with the existing REST endpoints so it runs alongside the worker without requiring a separate Node.js process.
+
+PandaDoc support is driven through the tool catalog. Provide `PANDADOC_API_KEY` and optionally `PANDADOC_BASE_URL` to execute real API calls. When the key is omitted the application falls back to stub data so the agent can still demonstrate the conversation flow.
 
 ## Testing
 
