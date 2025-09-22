@@ -18,8 +18,8 @@ public class TemporalConfiguration {
     @Bean
     public WorkflowServiceStubs workflowServiceStubs(TemporalProperties properties) {
         WorkflowServiceStubsOptions.Builder builder = WorkflowServiceStubsOptions.newBuilder();
-        if (properties.getAddress() != null && !properties.getAddress().isBlank()) {
-            builder.setTarget(properties.getAddress());
+        if (properties.address() != null && !properties.address().isBlank()) {
+            builder.setTarget(properties.address());
         }
         return WorkflowServiceStubs.newInstance(builder.build());
     }
@@ -27,7 +27,7 @@ public class TemporalConfiguration {
     @Bean
     public WorkflowClient workflowClient(WorkflowServiceStubs workflowServiceStubs, TemporalProperties properties) {
         WorkflowClientOptions options = WorkflowClientOptions.newBuilder()
-                .setNamespace(properties.getNamespace())
+                .setNamespace(properties.namespace())
                 .build();
         return WorkflowClient.newInstance(workflowServiceStubs, options);
     }
@@ -38,7 +38,7 @@ public class TemporalConfiguration {
             ToolActivitiesImpl toolActivities,
             TemporalProperties properties) {
         WorkerFactory factory = WorkerFactory.newInstance(workflowClient);
-        Worker worker = factory.newWorker(properties.getTaskQueue());
+        Worker worker = factory.newWorker(properties.taskQueue());
         worker.registerWorkflowImplementationTypes(AgentGoalWorkflowImpl.class);
         worker.registerActivitiesImplementations(toolActivities);
         factory.start();
