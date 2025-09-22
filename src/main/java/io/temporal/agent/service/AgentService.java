@@ -36,7 +36,7 @@ public class AgentService {
 
         WorkflowOptions options = WorkflowOptions.newBuilder()
                 .setWorkflowId(workflowId != null ? workflowId : UUID.randomUUID().toString())
-                .setTaskQueue(properties.getTaskQueue())
+                .setTaskQueue(properties.taskQueue())
                 .build();
 
         AgentGoalWorkflow workflow = workflowClient.newWorkflowStub(AgentGoalWorkflow.class, options);

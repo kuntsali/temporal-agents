@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temporal Agent Chat</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="brand">
+                <h1>Temporal Agent</h1>
+                <p class="subtitle">Goal-driven automation with PandaDoc</p>
+            </div>
+            <section class="panel">
+                <h2>Goals</h2>
+                <div id="goal-list" class="goal-list"></div>
+                <button id="start-conversation" class="primary" disabled>Start Conversation</button>
+                <button id="end-conversation" class="danger" disabled>End Conversation</button>
+            </section>
+            <section class="panel">
+                <div class="panel-header">
+                    <h2>Templates</h2>
+                    <div class="template-search">
+                        <input id="template-search" type="search" placeholder="Search templates" aria-label="Search templates">
+                        <button id="template-refresh" class="icon-button" title="Refresh templates">⟳</button>
+                    </div>
+                </div>
+                <div id="template-list" class="template-list"></div>
+            </section>
+            <section class="panel small">
+                <h2>Status</h2>
+                <dl class="status">
+                    <div>
+                        <dt>Workflow ID</dt>
+                        <dd id="status-workflow">—</dd>
+                    </div>
+                    <div>
+                        <dt>Selected Goal</dt>
+                        <dd id="status-goal">—</dd>
+                    </div>
+                    <div>
+                        <dt>Next Step</dt>
+                        <dd id="status-next">—</dd>
+                    </div>
+                </dl>
+            </section>
+        </aside>
+        <main class="chat">
+            <header class="chat-header">
+                <div>
+                    <h2>Conversation</h2>
+                    <p class="chat-hint">Send natural language instructions and the agent will orchestrate PandaDoc.</p>
+                </div>
+                <div class="chat-actions">
+                    <button id="refresh-history" class="icon-button" title="Refresh history">⟳</button>
+                </div>
+            </header>
+            <section id="notification" class="tool-card hidden notification-card" aria-live="assertive"></section>
+            <section id="pending-tool" class="tool-card hidden" aria-live="polite"></section>
+            <section id="chat-messages" class="chat-messages" aria-live="polite" aria-label="Conversation history"></section>
+            <form id="prompt-form" class="chat-input" autocomplete="off">
+                <label class="sr-only" for="prompt">Prompt</label>
+                <textarea id="prompt" name="prompt" rows="3" placeholder="Ask the agent for help (e.g. create NDA for Acme)..." required></textarea>
+                <div class="input-actions">
+                    <button type="button" id="confirm-tool" class="secondary" disabled>Confirm Tool</button>
+                    <button type="submit" id="send-prompt" class="primary" disabled>Send</button>
+                </div>
+            </form>
+        </main>
+    </div>
+    <template id="message-template">
+        <article class="message">
+            <div class="message-meta">
+                <span class="message-role"></span>
+                <time class="message-time"></time>
+            </div>
+            <div class="message-content"></div>
+        </article>
+    </template>
+    <script src="assets/app.js" type="module"></script>
+</body>
+</html>
