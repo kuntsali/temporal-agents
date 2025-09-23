@@ -142,6 +142,7 @@ public class AgentGoalWorkflowImpl implements AgentGoalWorkflow {
                     }
                     waitingForConfirm = false;
                     confirmed = false;
+                  
                     currentTool = null;
                 } else if (nextStep == NextStep.DONE) {
                     conversationHistory.addMessage("agent", this.toolDecision.toRawMap());
@@ -254,7 +255,7 @@ public class AgentGoalWorkflowImpl implements AgentGoalWorkflow {
     private boolean isGoalSelection(AgentGoal candidate) {
         return candidate != null && "goal_choose_agent_type".equals(candidate.getId());
     }
-
+  
     private AgentGoal createGoalSelectionGoal() {
         AgentGoal selection = new AgentGoal();
         selection.setId("goal_choose_agent_type");
