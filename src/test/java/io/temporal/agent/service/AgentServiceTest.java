@@ -2,12 +2,21 @@ package io.temporal.agent.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.temporal.agent.config.TemporalProperties;
 import io.temporal.agent.goals.GoalRegistry;
 import io.temporal.agent.model.tools.AgentGoal;
+import io.temporal.agent.workflow.AgentGoalWorkflow;
+import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.client.WorkflowClient;
+import io.temporal.client.WorkflowNotFoundException;
+import io.temporal.client.WorkflowQueryRejectedException;
+
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.List;
@@ -29,11 +38,54 @@ class AgentServiceTest {
     @Mock
     private GoalRegistry goalRegistry;
 
+    @Mock
+    private AgentGoalWorkflow workflowStub;
+
     private AgentService agentService;
 
     @BeforeEach
     void setUp() {
         agentService = new AgentService(workflowClient, temporalProperties, goalRegistry);
+    }
+
+    @Test
+    void getHistoryWrapsFailedPreconditionAsConversationNotFound() {
+        String workflowId = "wf-id";
+        when(workflowClient.newWorkflowStub(eq(AgentGoalWorkflow.class), eq(workflowId))).thenReturn(workflowStub);
+        StatusRuntimeException statusException = Status.FAILED_PRECONDITION.asRuntimeException();
+        when(workflowStub.getConversationHistory()).thenThrow(statusException);
+
+        assertThatThrownBy(() -> agentService.getHistory(workflowId))
+                .isInstanceOf(ConversationNotFoundException.class)
+                .hasMessageContaining(workflowId);
+    }
+
+    @Test
+    void getHistoryWrapsWorkflowQueryRejectedException() {
+        String workflowId = "wf-id";
+        when(workflowClient.newWorkflowStub(eq(AgentGoalWorkflow.class), eq(workflowId))).thenReturn(workflowStub);
+        WorkflowExecution execution = WorkflowExecution.newBuilder().setWorkflowId(workflowId).build();
+        WorkflowQueryRejectedException exception =
+                new WorkflowQueryRejectedException(execution, "conversationHistory", Status.ABORTED.asRuntimeException());
+        when(workflowStub.getConversationHistory()).thenThrow(exception);
+
+        assertThatThrownBy(() -> agentService.getHistory(workflowId))
+                .isInstanceOf(ConversationNotFoundException.class)
+                .hasMessageContaining(workflowId);
+    }
+
+    @Test
+    void sendPromptWrapsWorkflowNotFoundException() {
+        String workflowId = "wf-id";
+        when(workflowClient.newWorkflowStub(eq(AgentGoalWorkflow.class), eq(workflowId))).thenReturn(workflowStub);
+        WorkflowExecution execution = WorkflowExecution.newBuilder().setWorkflowId(workflowId).build();
+        doThrow(new WorkflowNotFoundException(execution, "AgentGoalWorkflow", Status.NOT_FOUND.asRuntimeException()))
+                .when(workflowStub)
+                .submitUserPrompt("hello");
+
+        assertThatThrownBy(() -> agentService.sendPrompt(workflowId, "hello"))
+                .isInstanceOf(ConversationNotFoundException.class)
+                .hasMessageContaining(workflowId);
     }
 
     @Test
