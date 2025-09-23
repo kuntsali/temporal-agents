@@ -29,8 +29,11 @@ public class AgentController {
     }
 
     @PostMapping("/start")
-    public StartConversationResponse startConversation(@RequestBody StartConversationRequest request) {
-        String workflowId = agentService.startConversation(request.getWorkflowId(), request.getGoalId());
+    public StartConversationResponse startConversation(
+            @RequestBody(required = false) StartConversationRequest request) {
+        String workflowId = agentService.startConversation(
+                request != null ? request.getWorkflowId() : null,
+                request != null ? request.getGoalId() : null);
         return new StartConversationResponse(workflowId);
     }
 
