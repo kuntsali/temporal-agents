@@ -200,6 +200,43 @@ class AgentWorkflowE2ETest {
         }
     }
 
+    @Test
+    void selectionGoalStarterPromptDoesNotLoopWhenPlannerKeepsRequestingNewGoal() {
+        ToolRegistry toolRegistry = new ToolRegistry();
+        new EcommerceToolsConfiguration(toolRegistry);
+        GoalRegistry goalRegistry = new GoalRegistry(toolRegistry);
+
+        StubToolActivities activities = new StubToolActivities(toolRegistry);
+        String greeting = "Hello! I can help you choose from our available goals.";
+        activities.enqueuePlannerResponse(plannerResponse(NextStep.PICK_NEW_GOAL, null, null, greeting));
+        activities.enqueuePlannerResponse(plannerResponse(NextStep.PICK_NEW_GOAL, null, null, greeting));
+
+        try (TestWorkflowEnvironment environment = TestWorkflowEnvironment.newInstance()) {
+            Worker worker = environment.newWorker(TASK_QUEUE);
+            worker.registerWorkflowImplementationTypes(AgentGoalWorkflowImpl.class);
+            worker.registerActivitiesImplementations(activities);
+            environment.start();
+
+            WorkflowClient client = environment.getWorkflowClient();
+            AgentGoalWorkflow workflow = client.newWorkflowStub(AgentGoalWorkflow.class,
+                    WorkflowOptions.newBuilder().setTaskQueue(TASK_QUEUE).build());
+            AgentGoal selectionGoal = goalRegistry.findGoal("goal_choose_agent_type");
+            CombinedInput input = new CombinedInput(new AgentGoalWorkflowParams(), selectionGoal);
+            WorkflowClient.start(workflow::run, input);
+
+            environment.sleep(Duration.ofSeconds(1));
+
+            ConversationHistory history = workflow.getConversationHistory();
+            long greetingCount = history.getMessages().stream()
+                    .filter(msg -> "agent".equals(msg.type()))
+                    .map(ConversationMessage::response)
+                    .filter(resp -> resp instanceof Map<?, ?> map && greeting.equals(map.get("response")))
+                    .count();
+            assertThat(greetingCount).isEqualTo(1L);
+            assertThat(activities.getSeenPrompts()).hasSize(1);
+        }
+    }
+
     private static Map<String, Object> plannerResponse(NextStep step, String tool, Map<String, Object> args, String response) {
         Map<String, Object> map = new HashMap<>();
         map.put("next", step.getJsonValue());

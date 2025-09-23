@@ -134,9 +134,15 @@ public class AgentGoalWorkflowImpl implements AgentGoalWorkflow {
                         confirmed = false;
                     }
                 } else if (nextStep == NextStep.PICK_NEW_GOAL) {
+                    boolean alreadySelectingGoal = isGoalSelection(this.goal);
                     this.goal = ensureGoal(null);
                     this.mcpToolsInfo = null;
-                    enqueueStarterPrompt();
+                    if (!alreadySelectingGoal) {
+                        enqueueStarterPrompt();
+                    }
+                    waitingForConfirm = false;
+                    confirmed = false;
+                  
                     currentTool = null;
                 } else if (nextStep == NextStep.DONE) {
                     conversationHistory.addMessage("agent", this.toolDecision.toRawMap());
@@ -246,6 +252,10 @@ public class AgentGoalWorkflowImpl implements AgentGoalWorkflow {
         return candidate != null ? candidate : createGoalSelectionGoal();
     }
 
+    private boolean isGoalSelection(AgentGoal candidate) {
+        return candidate != null && "goal_choose_agent_type".equals(candidate.getId());
+    }
+  
     private AgentGoal createGoalSelectionGoal() {
         AgentGoal selection = new AgentGoal();
         selection.setId("goal_choose_agent_type");
