@@ -15,6 +15,24 @@ const buildApiPath = (baseUrl, path) => (baseUrl ? `${baseUrl}${path}` : path);
 const AGENT_API = buildApiPath(API_BASE_URL, '/api/agent');
 const PANDADOC_API = buildApiPath(API_BASE_URL, '/api/pandadoc');
 
+const DEFAULT_FETCH_OPTIONS = Object.freeze({
+    mode: 'cors',
+    referrerPolicy: 'no-referrer',
+});
+
+const withDefaultOptions = (options = {}) => {
+    const init = {
+        ...DEFAULT_FETCH_OPTIONS,
+        ...options,
+    };
+
+    if (options.headers) {
+        init.headers = options.headers;
+    }
+
+    return init;
+};
+
 export const WORKFLOW_STORAGE_KEY = 'temporal-agent-workflow-id';
 
 export const storageService = {
@@ -77,13 +95,13 @@ function mapConversation(data) {
 export const apiService = {
     async startWorkflow(goalId) {
         const body = goalId ? JSON.stringify({ goalId }) : '{}';
-        const response = await fetch(`${AGENT_API}/start`, {
+        const response = await fetch(`${AGENT_API}/start`, withDefaultOptions({
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body,
-        });
+        }));
         const data = await handleResponse(response);
         if (!data.workflowId) {
             throw new ApiError('Failed to start workflow', response.status);
@@ -95,7 +113,7 @@ export const apiService = {
         if (!workflowId) {
             throw new ApiError('Missing workflow id', 400);
         }
-        const response = await fetch(`${AGENT_API}/${workflowId}/history`);
+        const response = await fetch(`${AGENT_API}/${workflowId}/history`, withDefaultOptions());
         const data = await handleResponse(response);
         return mapConversation(data);
     },
@@ -108,13 +126,13 @@ export const apiService = {
             throw new ApiError('Message cannot be empty', 400);
         }
 
-        const response = await fetch(`${AGENT_API}/${workflowId}/prompt`, {
+        const response = await fetch(`${AGENT_API}/${workflowId}/prompt`, withDefaultOptions({
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ prompt: message }),
-        });
+        }));
         await handleResponse(response);
     },
 
@@ -122,12 +140,12 @@ export const apiService = {
         if (!workflowId) {
             throw new ApiError('Missing workflow id', 400);
         }
-        const response = await fetch(`${AGENT_API}/${workflowId}/confirm`, {
+        const response = await fetch(`${AGENT_API}/${workflowId}/confirm`, withDefaultOptions({
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-        });
+        }));
         await handleResponse(response);
     },
 
@@ -136,12 +154,12 @@ export const apiService = {
             return;
         }
         try {
-            const response = await fetch(`${AGENT_API}/${workflowId}/end`, {
+            const response = await fetch(`${AGENT_API}/${workflowId}/end`, withDefaultOptions({
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-            });
+            }));
             await handleResponse(response);
         } catch (error) {
             // Ending an already-closed workflow should not disrupt the UI flow.
@@ -155,7 +173,7 @@ export const apiService = {
             params.set('search', searchTerm);
         }
         const url = `${PANDADOC_API}/templates${params.toString() ? `?${params.toString()}` : ''}`;
-        const response = await fetch(url);
+        const response = await fetch(url, withDefaultOptions());
         return handleResponse(response);
     },
 };

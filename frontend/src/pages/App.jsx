@@ -29,7 +29,7 @@ export default function App() {
     const [userInput, setUserInput] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(INITIAL_ERROR_STATE);
-    const [done, setDone] = useState(true);
+    const [done, setDone] = useState(false);
     const errorTimerRef = useRef(null);
 
     const startNewWorkflow = useCallback(async () => {
@@ -51,7 +51,7 @@ export default function App() {
         setWorkflowId(null);
         setConversation([]);
         setLastMessage(null);
-        setDone(true);
+        setDone(false);
         return await startNewWorkflow();
     }, [setWorkflowId, startNewWorkflow]);
 
@@ -119,7 +119,7 @@ export default function App() {
                 );
             } else {
                 setLoading(false);
-                setDone(true);
+                setDone(false);
                 setLastMessage(null);
             }
 
