@@ -46,6 +46,10 @@ public class ToolActivitiesImpl implements ToolActivities {
     @Override
     public ValidationResult agentValidatePrompt(ValidationInput input) {
         AgentGoal goal = input.getAgentGoal();
+        if (goal == null) {
+            LOGGER.debug("No agent goal provided for validation; accepting prompt as valid");
+            return new ValidationResult(true, Collections.emptyMap());
+        }
         StringBuilder context = new StringBuilder();
         context.append("The agent goal and tools are as follows:\n");
         context.append("Description: ").append(goal.getDescription()).append('\n');
