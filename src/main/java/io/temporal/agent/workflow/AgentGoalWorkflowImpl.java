@@ -142,7 +142,6 @@ public class AgentGoalWorkflowImpl implements AgentGoalWorkflow {
                     }
                     waitingForConfirm = false;
                     confirmed = false;
-                  
                     currentTool = null;
                 } else if (nextStep == NextStep.DONE) {
                     conversationHistory.addMessage("agent", this.toolDecision.toRawMap());
@@ -223,7 +222,6 @@ public class AgentGoalWorkflowImpl implements AgentGoalWorkflow {
         if (starterPrompt == null || starterPrompt.isBlank()) {
             return;
         }
-
         String sanitizedPrompt = starterPrompt.startsWith("###")
                 ? starterPrompt
                 : "### " + starterPrompt.trim();
@@ -255,15 +253,25 @@ public class AgentGoalWorkflowImpl implements AgentGoalWorkflow {
     private boolean isGoalSelection(AgentGoal candidate) {
         return candidate != null && "goal_choose_agent_type".equals(candidate.getId());
     }
-  
     private AgentGoal createGoalSelectionGoal() {
         AgentGoal selection = new AgentGoal();
         selection.setId("goal_choose_agent_type");
         selection.setCategoryTag("core");
         selection.setAgentName("Select Agent Type");
         selection.setAgentFriendlyDescription("Help the user choose which agent to interact with.");
-        selection.setDescription("Understand the user's intent and propose the best agent goal from the catalog.");
-        selection.setStarterPrompt("Greet the user and explain you can help choose from available goals.");
+        selection.setDescription(String.join(" ",
+                "Act as an agent concierge who learns what the user wants to achieve and pairs them with the best catalog goal.",
+                "Ask about their objective, timing, and any constraints, then recommend the most relevant agent.",
+                "Offer to switch them into that agent once they agree.",
+                "Keep your tone warm, concise, and focused on moving them forward."));
+        selection.setStarterPrompt(String.join(" ",
+                "Warmly welcome the user, explain that you can match them with the right assistant from our catalog,",
+                "and ask them to share what they need help accomplishing."));
+        selection.setExampleConversationHistory(String.join("\n",
+                "user: I want help tracking an order",
+                "agent: Happy to help! I can bring in our order tracking assistant. Are you trying to check a specific order?",
+                "user: Yes, order 102.",
+                "agent: Perfect. I'll hand things off to the order status assistant so we can look that up together."));
         return selection;
     }
 
