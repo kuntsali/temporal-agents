@@ -1,13 +1,32 @@
 const resolveRuntimeBaseUrl = () => {
-    if (typeof window !== 'undefined' && window.location?.origin) {
-        return window.location.origin;
+    if (typeof window === 'undefined' || !window.location?.origin) {
+        return '';
     }
-    return '';
+
+    const { protocol, hostname, port } = window.location;
+    const isLocalhost = ['localhost', '127.0.0.1', '0.0.0.0'].includes(hostname);
+
+    if (isLocalhost && port && port !== '8080') {
+        return `${protocol}//${hostname}:8080`;
+    }
+
+    return window.location.origin;
 };
 
-const DEFAULT_BASE_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL)
-    ? import.meta.env.VITE_API_BASE_URL
-    : resolveRuntimeBaseUrl() || 'http://localhost:8080';
+const DEFAULT_BASE_URL = (() => {
+    if (typeof import.meta !== 'undefined') {
+        const explicitBaseUrl = import.meta.env?.VITE_API_BASE_URL;
+        if (explicitBaseUrl) {
+            return explicitBaseUrl;
+        }
+
+        if (import.meta.env?.DEV) {
+            return 'http://localhost:8080';
+        }
+    }
+
+    return resolveRuntimeBaseUrl() || 'http://localhost:8080';
+})();
 
 const trimTrailingSlash = (url) => url.replace(/\/$/, '');
 const API_BASE_URL = trimTrailingSlash(DEFAULT_BASE_URL);

@@ -1,5 +1,6 @@
 package io.temporal.agent.config;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.temporal.agent.activities.ToolActivitiesImpl;
 import io.temporal.agent.workflow.AgentGoalWorkflowImpl;
@@ -9,8 +10,14 @@ import io.temporal.serviceclient.WorkflowServiceStubs;
 import io.temporal.serviceclient.WorkflowServiceStubsOptions;
 import io.temporal.worker.Worker;
 import io.temporal.worker.WorkerFactory;
+import java.util.List;
+
+import org.springframework.boot.web.client.RestClientCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.converter.HttpMessageConverter;
+import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 
 @Configuration
 public class TemporalConfiguration {
@@ -46,7 +53,23 @@ public class TemporalConfiguration {
     }
 
     @Bean
-    public ObjectMapper objectMapper() {
-        return new ObjectMapper().findAndRegisterModules();
+    public ObjectMapper objectMapper(Jackson2ObjectMapperBuilder builder) {
+        ObjectMapper mapper = builder.createXmlMapper(false).build();
+        mapper.findAndRegisterModules();
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        return mapper;
+    }
+
+    @Bean
+    public RestClientCustomizer restClientCustomizer(ObjectMapper objectMapper) {
+        return builder -> builder.messageConverters(converters -> replaceJacksonMapper(converters, objectMapper));
+    }
+
+    private void replaceJacksonMapper(List<HttpMessageConverter<?>> converters, ObjectMapper objectMapper) {
+        for (HttpMessageConverter<?> converter : converters) {
+            if (converter instanceof MappingJackson2HttpMessageConverter jacksonConverter) {
+                jacksonConverter.setObjectMapper(objectMapper);
+            }
+        }
     }
 }
