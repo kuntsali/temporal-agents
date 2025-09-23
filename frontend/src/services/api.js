@@ -1,19 +1,56 @@
 const resolveRuntimeBaseUrl = () => {
-    if (typeof window !== 'undefined' && window.location?.origin) {
-        return window.location.origin;
+    if (typeof window === 'undefined' || !window.location?.origin) {
+        return '';
     }
-    return '';
+
+    const { protocol, hostname, port } = window.location;
+    const isLocalhost = ['localhost', '127.0.0.1', '0.0.0.0'].includes(hostname);
+
+    if (isLocalhost && port && port !== '8080') {
+        return `${protocol}//${hostname}:8080`;
+    }
+
+    return window.location.origin;
 };
 
-const DEFAULT_BASE_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL)
-    ? import.meta.env.VITE_API_BASE_URL
-    : resolveRuntimeBaseUrl() || 'http://localhost:8080';
+const DEFAULT_BASE_URL = (() => {
+    if (typeof import.meta !== 'undefined') {
+        const explicitBaseUrl = import.meta.env?.VITE_API_BASE_URL;
+        if (explicitBaseUrl) {
+            return explicitBaseUrl;
+        }
+
+        if (import.meta.env?.DEV) {
+            return 'http://localhost:8080';
+        }
+    }
+
+    return resolveRuntimeBaseUrl() || 'http://localhost:8080';
+})();
 
 const trimTrailingSlash = (url) => url.replace(/\/$/, '');
 const API_BASE_URL = trimTrailingSlash(DEFAULT_BASE_URL);
 const buildApiPath = (baseUrl, path) => (baseUrl ? `${baseUrl}${path}` : path);
 const AGENT_API = buildApiPath(API_BASE_URL, '/api/agent');
 const PANDADOC_API = buildApiPath(API_BASE_URL, '/api/pandadoc');
+
+const DEFAULT_FETCH_OPTIONS = Object.freeze({
+    mode: 'cors',
+    referrerPolicy: 'no-referrer',
+});
+
+const withDefaultOptions = (options = {}) => {
+    const init = {
+        ...DEFAULT_FETCH_OPTIONS,
+        ...options,
+    };
+
+    if (options.headers) {
+        init.headers = options.headers;
+    }
+
+    return init;
+};
 
 export const WORKFLOW_STORAGE_KEY = 'temporal-agent-workflow-id';
 
@@ -77,13 +114,13 @@ function mapConversation(data) {
 export const apiService = {
     async startWorkflow(goalId) {
         const body = goalId ? JSON.stringify({ goalId }) : '{}';
-        const response = await fetch(`${AGENT_API}/start`, {
+        const response = await fetch(`${AGENT_API}/start`, withDefaultOptions({
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body,
-        });
+        }));
         const data = await handleResponse(response);
         if (!data.workflowId) {
             throw new ApiError('Failed to start workflow', response.status);
@@ -95,7 +132,7 @@ export const apiService = {
         if (!workflowId) {
             throw new ApiError('Missing workflow id', 400);
         }
-        const response = await fetch(`${AGENT_API}/${workflowId}/history`);
+        const response = await fetch(`${AGENT_API}/${workflowId}/history`, withDefaultOptions());
         const data = await handleResponse(response);
         return mapConversation(data);
     },
@@ -108,13 +145,13 @@ export const apiService = {
             throw new ApiError('Message cannot be empty', 400);
         }
 
-        const response = await fetch(`${AGENT_API}/${workflowId}/prompt`, {
+        const response = await fetch(`${AGENT_API}/${workflowId}/prompt`, withDefaultOptions({
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ prompt: message }),
-        });
+        }));
         await handleResponse(response);
     },
 
@@ -122,12 +159,12 @@ export const apiService = {
         if (!workflowId) {
             throw new ApiError('Missing workflow id', 400);
         }
-        const response = await fetch(`${AGENT_API}/${workflowId}/confirm`, {
+        const response = await fetch(`${AGENT_API}/${workflowId}/confirm`, withDefaultOptions({
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-        });
+        }));
         await handleResponse(response);
     },
 
@@ -136,12 +173,12 @@ export const apiService = {
             return;
         }
         try {
-            const response = await fetch(`${AGENT_API}/${workflowId}/end`, {
+            const response = await fetch(`${AGENT_API}/${workflowId}/end`, withDefaultOptions({
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-            });
+            }));
             await handleResponse(response);
         } catch (error) {
             // Ending an already-closed workflow should not disrupt the UI flow.
@@ -155,7 +192,7 @@ export const apiService = {
             params.set('search', searchTerm);
         }
         const url = `${PANDADOC_API}/templates${params.toString() ? `?${params.toString()}` : ''}`;
-        const response = await fetch(url);
+        const response = await fetch(url, withDefaultOptions());
         return handleResponse(response);
     },
 };

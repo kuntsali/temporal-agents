@@ -206,9 +206,19 @@ public class AgentGoalWorkflowImpl implements AgentGoalWorkflow {
     }
 
     private void enqueueStarterPrompt() {
-        if (goal != null && goal.getStarterPrompt() != null && !goal.getStarterPrompt().isBlank()) {
-            promptQueue.add(goal.getStarterPrompt());
+        if (goal == null) {
+            return;
         }
+
+        String starterPrompt = goal.getStarterPrompt();
+        if (starterPrompt == null || starterPrompt.isBlank()) {
+            return;
+        }
+
+        String sanitizedPrompt = starterPrompt.startsWith("###")
+                ? starterPrompt
+                : "### " + starterPrompt.trim();
+        promptQueue.add(sanitizedPrompt);
     }
 
     private boolean isUserPrompt(String prompt) {
