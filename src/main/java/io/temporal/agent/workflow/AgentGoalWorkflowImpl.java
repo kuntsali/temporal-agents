@@ -58,17 +58,13 @@ public class AgentGoalWorkflowImpl implements AgentGoalWorkflow {
 
     @Override
     public String run(CombinedInput input) {
-        this.goal = input != null ? input.getAgentGoal() : null;
-        if (this.goal == null) {
-            this.goal = new AgentGoal();
-            this.goal.setId("goal_choose_agent_type");
-            this.goal.setAgentName("Select Agent Type");
-        }
+        this.goal = ensureGoal(input != null ? input.getAgentGoal() : null);
         AgentGoalWorkflowParams params = input != null ? input.getToolParams() : null;
 
         lookupWorkflowEnvSettings();
-        if (goal != null && goal.getMcpServerDefinition() != null) {
-            this.mcpToolsInfo = llmActivities.listMcpTools(goal.getMcpServerDefinition(), goal.getMcpServerDefinition().getIncludedTools());
+        this.mcpToolsInfo = null;
+        if (this.goal.getMcpServerDefinition() != null) {
+            this.mcpToolsInfo = llmActivities.listMcpTools(this.goal.getMcpServerDefinition(), this.goal.getMcpServerDefinition().getIncludedTools());
         }
 
         if (params != null) {
@@ -108,15 +104,17 @@ public class AgentGoalWorkflowImpl implements AgentGoalWorkflow {
 
                 if (isUserPrompt(prompt)) {
                     conversationHistory.addMessage("user", prompt);
-                    ValidationResult validation = llmActivities.agentValidatePrompt(
-                            new ValidationInput(prompt, conversationHistory, goal));
-                    if (!validation.isValidationResult()) {
-                        conversationHistory.addMessage("agent", validation.getValidationFailedReason());
-                        continue;
+                    if (this.goal != null) {
+                        ValidationResult validation = llmActivities.agentValidatePrompt(
+                                new ValidationInput(prompt, conversationHistory, this.goal));
+                        if (!validation.isValidationResult()) {
+                            conversationHistory.addMessage("agent", validation.getValidationFailedReason());
+                            continue;
+                        }
                     }
                 }
 
-                String context = AgentPromptGenerator.generateGenAiPrompt(goal, conversationHistory, multiGoalMode, toolDecision, mcpToolsInfo);
+                String context = AgentPromptGenerator.generateGenAiPrompt(this.goal, conversationHistory, multiGoalMode, toolDecision, mcpToolsInfo);
                 Map<String, Object> rawDecision = llmActivities.agentToolPlanner(new ToolPromptInput(prompt, context));
                 this.toolDecision = ToolDecision.fromRawMap(rawDecision);
                 this.toolDecision.ensureForceConfirm(showToolArgsConfirmation);
@@ -136,8 +134,9 @@ public class AgentGoalWorkflowImpl implements AgentGoalWorkflow {
                         confirmed = false;
                     }
                 } else if (nextStep == NextStep.PICK_NEW_GOAL) {
-                    conversationHistory.addMessage("agent", this.toolDecision.toRawMap());
-                    this.goal = null;
+                    this.goal = ensureGoal(null);
+                    this.mcpToolsInfo = null;
+                    enqueueStarterPrompt();
                     currentTool = null;
                 } else if (nextStep == NextStep.DONE) {
                     conversationHistory.addMessage("agent", this.toolDecision.toRawMap());
@@ -175,7 +174,11 @@ public class AgentGoalWorkflowImpl implements AgentGoalWorkflow {
     @Override
     public void selectGoal(AgentGoal goal) {
         Workflow.getLogger(AgentGoalWorkflowImpl.class).info("Selecting goal {}", goal != null ? goal.getId() : "null");
-        this.goal = goal;
+        this.goal = ensureGoal(goal);
+        this.mcpToolsInfo = null;
+        if (this.goal.getMcpServerDefinition() != null) {
+            this.mcpToolsInfo = llmActivities.listMcpTools(this.goal.getMcpServerDefinition(), this.goal.getMcpServerDefinition().getIncludedTools());
+        }
         enqueueStarterPrompt();
     }
 
@@ -237,6 +240,21 @@ public class AgentGoalWorkflowImpl implements AgentGoalWorkflow {
         conversationHistory.addMessage("tool_result", result);
         promptQueue.add(AgentPromptGenerator.generateToolCompletionPrompt(currentTool, result));
         return false;
+    }
+
+    private AgentGoal ensureGoal(AgentGoal candidate) {
+        return candidate != null ? candidate : createGoalSelectionGoal();
+    }
+
+    private AgentGoal createGoalSelectionGoal() {
+        AgentGoal selection = new AgentGoal();
+        selection.setId("goal_choose_agent_type");
+        selection.setCategoryTag("core");
+        selection.setAgentName("Select Agent Type");
+        selection.setAgentFriendlyDescription("Help the user choose which agent to interact with.");
+        selection.setDescription("Understand the user's intent and propose the best agent goal from the catalog.");
+        selection.setStarterPrompt("Greet the user and explain you can help choose from available goals.");
+        return selection;
     }
 
     private List<String> findMissingArgs(Map<String, Object> args) {
