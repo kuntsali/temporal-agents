@@ -222,7 +222,6 @@ public class AgentGoalWorkflowImpl implements AgentGoalWorkflow {
         if (starterPrompt == null || starterPrompt.isBlank()) {
             return;
         }
-
         String sanitizedPrompt = starterPrompt.startsWith("###")
                 ? starterPrompt
                 : "### " + starterPrompt.trim();
@@ -254,7 +253,6 @@ public class AgentGoalWorkflowImpl implements AgentGoalWorkflow {
     private boolean isGoalSelection(AgentGoal candidate) {
         return candidate != null && "goal_choose_agent_type".equals(candidate.getId());
     }
-
     private AgentGoal createGoalSelectionGoal() {
         AgentGoal selection = new AgentGoal();
         selection.setId("goal_choose_agent_type");
