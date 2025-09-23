@@ -64,15 +64,23 @@ public class GoalRegistry implements SmartInitializingSingleton {
         goal.setCategoryTag("ecommerce");
         goal.setAgentName("Check Order Status");
         goal.setAgentFriendlyDescription("Check the status of a customer's order and optionally track the package.");
-        goal.setDescription("The user wants to know the status of a specific order. Collect the order id, run GetOrder, and if the status is shipped or delivered offer TrackPackage.");
-        goal.setStarterPrompt("Welcome me, explain what you can do, then ask for the order details you need.");
+        goal.setDescription(String.join(" ",
+                "Serve as a friendly order support specialist who confirms the customer's details, retrieves the latest status,",
+                "and clearly explains what you find.",
+                "Always gather the order identifier before calling GetOrder.",
+                "If the package has shipped or delivered, proactively offer to run TrackPackage to share the current tracking",
+                "information.",
+                "Keep responses short, acknowledge what the customer has already said, and ask only one question at a time."));
+        goal.setStarterPrompt(String.join(" ",
+                "Warmly introduce yourself as the order support assistant, mention you can check order status and tracking updates,",
+                "and ask for the order number or key details you need to begin."));
         goal.setExampleConversationHistory(String.join("\n",
                 "user: I'd like to know the status of my order",
-                "agent: Certainly! Can you share your order number?",
+                "agent: Hi! I'd be happy to check on that for you. What's the order number?",
                 "user: It's 102",
                 "user_confirmed_tool_run: <user clicks confirm on GetOrder>",
                 "tool_result: {... order information ...}",
-                "agent: Your order was shipped and includes tracking id 039813852990618. Do you want to see tracking updates?"));
+                "agent: Your order shipped earlier today and the tracking ID is 039813852990618. Want me to keep an eye on delivery for you?"));
         goal.setTools(List.of(getOrder, trackPackage));
         return goal;
     }
@@ -89,15 +97,21 @@ public class GoalRegistry implements SmartInitializingSingleton {
         goal.setCategoryTag("ecommerce");
         goal.setAgentName("List All Orders");
         goal.setAgentFriendlyDescription("List a customer's orders and offer to drill into details.");
-        goal.setDescription("Collect the customer's email address, run ListOrders, and optionally follow up with GetOrder and TrackPackage for specific orders if the user asks.");
-        goal.setStarterPrompt("Introduce yourself and ask which customer you should look up.");
+        goal.setDescription(String.join(" ",
+                "Help the customer review their recent orders.",
+                "Collect the customer's email address, run ListOrders, and summarize the results in everyday language.",
+                "If they request information on a particular order, follow up with GetOrder and TrackPackage as needed.",
+                "Keep the conversation conversational, ask one question at a time, and avoid repeating information they've already provided."));
+        goal.setStarterPrompt(String.join(" ",
+                "Introduce yourself as the order history assistant, mention you can list their recent orders,",
+                "and ask which customer's email address you should use."));
         goal.setExampleConversationHistory(String.join("\n",
                 "user: I'd like to see my orders",
-                "agent: Happy to help. What's the email address on the account?",
+                "agent: Happy to help! Which email should I look up for you?",
                 "user: matt.murdock@nelsonmurdock.com",
                 "user_confirmed_tool_run: <user clicks confirm on ListOrders>",
                 "tool_result: {... list of orders ...}",
-                "agent: I found multiple orders. Would you like details on a specific one?"));
+                "agent: I found a few recent orders for that email. Want details on any particular one?"));
         goal.setTools(List.of(listOrders, getOrder, trackPackage));
         return goal;
     }
@@ -108,11 +122,19 @@ public class GoalRegistry implements SmartInitializingSingleton {
         goal.setCategoryTag("core");
         goal.setAgentName("Select Agent Type");
         goal.setAgentFriendlyDescription("Help the user choose which agent to interact with.");
-        goal.setDescription("Understand the user's intent and propose the best agent goal from the catalog.");
-        goal.setStarterPrompt("Greet the user and explain you can help choose from available goals.");
+        goal.setDescription(String.join(" ",
+                "Act as an agent concierge who learns what the user wants to achieve and pairs them with the best catalog goal.",
+                "Ask about their objective, timing, and any constraints, then recommend the most relevant agent.",
+                "Offer to switch them into that agent once they agree.",
+                "Keep your tone warm, concise, and focused on moving them forward."));
+        goal.setStarterPrompt(String.join(" ",
+                "Warmly welcome the user, explain that you can match them with the right assistant from our catalog,",
+                "and ask them to share what they need help accomplishing."));
         goal.setExampleConversationHistory(String.join("\n",
                 "user: I want help tracking an order",
-                "agent: Great! I can connect you with the order tracking agent. Does that sound good?"));
+                "agent: Happy to help! I can bring in our order tracking assistant. Are you trying to check a specific order?",
+                "user: Yes, order 102.",
+                "agent: Perfect. I'll hand things off to the order status assistant so we can look that up together."));
         goal.setTools(Collections.emptyList());
         return goal;
     }
@@ -131,16 +153,19 @@ public class GoalRegistry implements SmartInitializingSingleton {
         goal.setAgentName("PandaDoc Agreement Automation");
         goal.setAgentFriendlyDescription("Prepare, send, and track PandaDoc agreements end-to-end.");
         goal.setDescription(String.join(" ",
-                "Guide the user through choosing a PandaDoc template, collecting signer details,",
-                "filling required token values, creating the document draft, sending it for signature,",
-                "and monitoring status until it is completed. Always list templates so the user can",
-                "confirm the correct template name or ID before creating a document."));
-        goal.setStarterPrompt("Introduce yourself as a PandaDoc assistant, offer to list templates, and gather the request details.");
+                "Guide the user through automating a PandaDoc agreement from start to finish.",
+                "Begin by offering to list templates and confirming the correct one.",
+                "Collect signer details and any required token values before creating the draft with CreatePandadocDocument.",
+                "After creation, send the document with SendPandadocDocument and monitor status with GetPandadocDocumentStatus.",
+                "Explain each step plainly, stay concise, and confirm before moving on."));
+        goal.setStarterPrompt(String.join(" ",
+                "Introduce yourself as the PandaDoc automation assistant, offer to list available templates,",
+                "and ask for the document details or recipients to get started."));
         goal.setExampleConversationHistory(String.join("\n",
                 "user: Can you create an NDA for Acme?",
-                "agent: Absolutely. Here are the PandaDoc templates I can use: ... Which one should we start with?",
-                "user: Use the Mutual NDA template and send it to John Doe john@example.com.",
-                "agent: Great! I'll create the document draft now and send it for signature once it's ready."));
+                "agent: Absolutely! I can walk you through it. Want me to pull up the available templates first?",
+                "user: Yes, show me what's available.",
+                "agent: Here are the top options... Which template should we use and who needs to sign?"));
         goal.setTools(List.of(listTemplates, createDocument, sendDocument, getStatus));
         return goal;
     }

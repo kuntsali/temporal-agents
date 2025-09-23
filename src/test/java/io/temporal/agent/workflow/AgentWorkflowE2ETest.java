@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.temporal.agent.activities.ToolActivities;
 import io.temporal.agent.goals.GoalRegistry;
+import io.temporal.agent.model.conversation.ConversationHistory;
+import io.temporal.agent.model.conversation.ConversationMessage;
 import io.temporal.agent.model.tools.AgentGoal;
 import io.temporal.agent.model.workflow.AgentGoalWorkflowParams;
 import io.temporal.agent.model.workflow.CombinedInput;
@@ -146,6 +148,95 @@ class AgentWorkflowE2ETest {
         }
     }
 
+    @Test
+    void pickNewGoalResetsToSelectionGoalWithoutDuplicateMessages() {
+        ToolRegistry toolRegistry = new ToolRegistry();
+        new EcommerceToolsConfiguration(toolRegistry);
+        GoalRegistry goalRegistry = new GoalRegistry(toolRegistry);
+
+        StubToolActivities activities = new StubToolActivities(toolRegistry);
+        activities.enqueuePlannerResponse(plannerResponse(NextStep.QUESTION, null, null,
+                "Hello! I'm ready to help."));
+        String pickResponse = "Let's choose the best agent for this request.";
+        activities.enqueuePlannerResponse(plannerResponse(NextStep.PICK_NEW_GOAL, null, null, pickResponse));
+        activities.enqueuePlannerResponse(plannerResponse(NextStep.QUESTION, null, null,
+                "Great! Tell me a bit about what you need so I can suggest an agent."));
+        activities.enqueuePlannerResponse(plannerResponse(NextStep.QUESTION, null, null,
+                "Here are some ideas to get us started."));
+        activities.setFailOnNullGoalValidation(true);
+
+        try (TestWorkflowEnvironment environment = TestWorkflowEnvironment.newInstance()) {
+            Worker worker = environment.newWorker(TASK_QUEUE);
+            worker.registerWorkflowImplementationTypes(AgentGoalWorkflowImpl.class);
+            worker.registerActivitiesImplementations(activities);
+            environment.start();
+
+            WorkflowClient client = environment.getWorkflowClient();
+            AgentGoalWorkflow workflow = client.newWorkflowStub(AgentGoalWorkflow.class,
+                    WorkflowOptions.newBuilder().setTaskQueue(TASK_QUEUE).build());
+            AgentGoal goal = goalRegistry.findGoal("goal_ecomm_list_orders");
+            CombinedInput input = new CombinedInput(new AgentGoalWorkflowParams(), goal);
+            WorkflowClient.start(workflow::run, input);
+
+            environment.sleep(Duration.ofSeconds(1));
+
+            workflow.submitUserPrompt("Help me choose a different goal");
+            environment.sleep(Duration.ofSeconds(1));
+
+            workflow.submitUserPrompt("What options do I have?");
+            environment.sleep(Duration.ofSeconds(1));
+
+            ConversationHistory history = workflow.getConversationHistory();
+            long pickMessages = history.getMessages().stream()
+                    .filter(msg -> "agent".equals(msg.type()))
+                    .map(ConversationMessage::response)
+                    .filter(resp -> resp instanceof Map<?, ?> map && pickResponse.equals(map.get("response")))
+                    .count();
+            assertThat(pickMessages).isEqualTo(1L);
+
+            AgentGoal currentGoal = workflow.getCurrentGoal();
+            assertThat(currentGoal).isNotNull();
+            assertThat(currentGoal.getId()).isEqualTo("goal_choose_agent_type");
+        }
+    }
+
+    @Test
+    void selectionGoalStarterPromptDoesNotLoopWhenPlannerKeepsRequestingNewGoal() {
+        ToolRegistry toolRegistry = new ToolRegistry();
+        new EcommerceToolsConfiguration(toolRegistry);
+        GoalRegistry goalRegistry = new GoalRegistry(toolRegistry);
+
+        StubToolActivities activities = new StubToolActivities(toolRegistry);
+        String greeting = "Hello! I can help you choose from our available goals.";
+        activities.enqueuePlannerResponse(plannerResponse(NextStep.PICK_NEW_GOAL, null, null, greeting));
+        activities.enqueuePlannerResponse(plannerResponse(NextStep.PICK_NEW_GOAL, null, null, greeting));
+
+        try (TestWorkflowEnvironment environment = TestWorkflowEnvironment.newInstance()) {
+            Worker worker = environment.newWorker(TASK_QUEUE);
+            worker.registerWorkflowImplementationTypes(AgentGoalWorkflowImpl.class);
+            worker.registerActivitiesImplementations(activities);
+            environment.start();
+
+            WorkflowClient client = environment.getWorkflowClient();
+            AgentGoalWorkflow workflow = client.newWorkflowStub(AgentGoalWorkflow.class,
+                    WorkflowOptions.newBuilder().setTaskQueue(TASK_QUEUE).build());
+            AgentGoal selectionGoal = goalRegistry.findGoal("goal_choose_agent_type");
+            CombinedInput input = new CombinedInput(new AgentGoalWorkflowParams(), selectionGoal);
+            WorkflowClient.start(workflow::run, input);
+
+            environment.sleep(Duration.ofSeconds(1));
+
+            ConversationHistory history = workflow.getConversationHistory();
+            long greetingCount = history.getMessages().stream()
+                    .filter(msg -> "agent".equals(msg.type()))
+                    .map(ConversationMessage::response)
+                    .filter(resp -> resp instanceof Map<?, ?> map && greeting.equals(map.get("response")))
+                    .count();
+            assertThat(greetingCount).isEqualTo(1L);
+            assertThat(activities.getSeenPrompts()).hasSize(1);
+        }
+    }
+
     private static Map<String, Object> plannerResponse(NextStep step, String tool, Map<String, Object> args, String response) {
         Map<String, Object> map = new HashMap<>();
         map.put("next", step.getJsonValue());
@@ -162,6 +253,7 @@ class AgentWorkflowE2ETest {
         private final Deque<Map<String, Object>> plannerResponses = new ArrayDeque<>();
         private final List<String> seenPrompts = new ArrayList<>();
         private final ToolRegistry toolRegistry;
+        private boolean failOnNullGoalValidation;
 
         private StubToolActivities(ToolRegistry toolRegistry) {
             this.toolRegistry = toolRegistry;
@@ -175,8 +267,15 @@ class AgentWorkflowE2ETest {
             return seenPrompts;
         }
 
+        void setFailOnNullGoalValidation(boolean failOnNullGoalValidation) {
+            this.failOnNullGoalValidation = failOnNullGoalValidation;
+        }
+
         @Override
         public ValidationResult agentValidatePrompt(ValidationInput input) {
+            if (failOnNullGoalValidation && input.getAgentGoal() == null) {
+                throw new IllegalStateException("Validation invoked without a goal");
+            }
             return new ValidationResult(true, Map.of());
         }
 

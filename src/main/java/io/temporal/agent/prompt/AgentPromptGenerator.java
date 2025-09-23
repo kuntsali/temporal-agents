@@ -38,6 +38,22 @@ public final class AgentPromptGenerator {
         lines.add("*END CONVERSATION HISTORY*");
         lines.add("REMINDER: You can use the conversation history to infer arguments for the tools.");
 
+        lines.add("=== Agent Persona & Style ===");
+        String agentName = Objects.toString(goal.getAgentName(), "Assistant");
+        lines.add("You are \"" + agentName + "\".");
+        String persona = Objects.toString(goal.getAgentFriendlyDescription(), "").trim();
+        if (!persona.isEmpty()) {
+            lines.add("Your role: " + persona);
+        }
+        lines.add("Conversation style guidelines:");
+        lines.add("- Keep the `response` warm, professional, and concise (aim for 1-3 short sentences unless the user asks for more detail).");
+        lines.add("- Ask at most one question at a time and avoid repeating questions the user already answered.");
+        lines.add("- Acknowledge what the user has shared before requesting new details.");
+        lines.add("- When you mention tool outcomes, summarize them in everyday language before proposing next steps.");
+        lines.add("- Avoid bullet lists or enumerations unless the user specifically requests them.");
+        lines.add("- Never mention JSON schemas, internal tooling, or implementation details in the `response`.");
+        lines.add("- If the user asks what you can do, briefly relate your capabilities to the current goal and invite them to continue.");
+
         if (goal.getExampleConversationHistory() != null && !goal.getExampleConversationHistory().isBlank()) {
             lines.add("=== Example Conversation With These Tools ===");
             lines.add("Use this example to understand how tools are invoked and arguments are gathered.");
@@ -146,14 +162,15 @@ public final class AgentPromptGenerator {
         StringJoiner joiner = new StringJoiner(", ");
         missing.forEach(joiner::add);
         return "### The tool '" + toolName + "' is missing required args: " + joiner + ". "
-                + "Ask the user in plain language for those arguments, referencing the specific fields needed. "
+                + "Ask the user in one short, friendly question for those details, reaffirming anything you already know. "
+                + "Keep the language natural and avoid referencing the JSON schema. "
                 + "Respond with JSON using the schema {\"response\": \"<text>\", \"next\": \"question\", \"tool\": null, \"args\": { ... }}.";
     }
 
     public static String generateToolCompletionPrompt(String toolName, Map<String, Object> result) {
         return "### The '" + toolName + "' tool completed successfully with " + prettyPrint(result) + ". "
-                + "INSTRUCTIONS: Parse this tool result as plain text, and use the system prompt containing the list of tools in sequence and the conversation history (and previous tool_results) to figure out next steps, if any. "
-                + "You will need to use the tool_results to auto-fill arguments for subsequent tools and also to figure out if all tools have been run. "
+                + "INSTRUCTIONS: Summarize the outcome in clear everyday language, then decide the next best step using the system prompt containing the list of tools in sequence and the conversation history (and previous tool_results). "
+                + "Use the tool_results to auto-fill arguments for subsequent tools and to verify whether every required tool has already run. "
                 + "{" + "\"next\": \"<question|confirm|pick-new-goal|done>\", \"tool\": \"<tool_name or null>\", \"args\": {\"<arg1>\": \"<value1 or null>\", \"<arg2>\": \"<value2 or null>\"}, \"response\": \"<plain text>\"}";
     }
 

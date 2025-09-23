@@ -58,17 +58,13 @@ public class AgentGoalWorkflowImpl implements AgentGoalWorkflow {
 
     @Override
     public String run(CombinedInput input) {
-        this.goal = input != null ? input.getAgentGoal() : null;
-        if (this.goal == null) {
-            this.goal = new AgentGoal();
-            this.goal.setId("goal_choose_agent_type");
-            this.goal.setAgentName("Select Agent Type");
-        }
+        this.goal = ensureGoal(input != null ? input.getAgentGoal() : null);
         AgentGoalWorkflowParams params = input != null ? input.getToolParams() : null;
 
         lookupWorkflowEnvSettings();
-        if (goal != null && goal.getMcpServerDefinition() != null) {
-            this.mcpToolsInfo = llmActivities.listMcpTools(goal.getMcpServerDefinition(), goal.getMcpServerDefinition().getIncludedTools());
+        this.mcpToolsInfo = null;
+        if (this.goal.getMcpServerDefinition() != null) {
+            this.mcpToolsInfo = llmActivities.listMcpTools(this.goal.getMcpServerDefinition(), this.goal.getMcpServerDefinition().getIncludedTools());
         }
 
         if (params != null) {
@@ -108,15 +104,17 @@ public class AgentGoalWorkflowImpl implements AgentGoalWorkflow {
 
                 if (isUserPrompt(prompt)) {
                     conversationHistory.addMessage("user", prompt);
-                    ValidationResult validation = llmActivities.agentValidatePrompt(
-                            new ValidationInput(prompt, conversationHistory, goal));
-                    if (!validation.isValidationResult()) {
-                        conversationHistory.addMessage("agent", validation.getValidationFailedReason());
-                        continue;
+                    if (this.goal != null) {
+                        ValidationResult validation = llmActivities.agentValidatePrompt(
+                                new ValidationInput(prompt, conversationHistory, this.goal));
+                        if (!validation.isValidationResult()) {
+                            conversationHistory.addMessage("agent", validation.getValidationFailedReason());
+                            continue;
+                        }
                     }
                 }
 
-                String context = AgentPromptGenerator.generateGenAiPrompt(goal, conversationHistory, multiGoalMode, toolDecision, mcpToolsInfo);
+                String context = AgentPromptGenerator.generateGenAiPrompt(this.goal, conversationHistory, multiGoalMode, toolDecision, mcpToolsInfo);
                 Map<String, Object> rawDecision = llmActivities.agentToolPlanner(new ToolPromptInput(prompt, context));
                 this.toolDecision = ToolDecision.fromRawMap(rawDecision);
                 this.toolDecision.ensureForceConfirm(showToolArgsConfirmation);
@@ -136,8 +134,14 @@ public class AgentGoalWorkflowImpl implements AgentGoalWorkflow {
                         confirmed = false;
                     }
                 } else if (nextStep == NextStep.PICK_NEW_GOAL) {
-                    conversationHistory.addMessage("agent", this.toolDecision.toRawMap());
-                    this.goal = null;
+                    boolean alreadySelectingGoal = isGoalSelection(this.goal);
+                    this.goal = ensureGoal(null);
+                    this.mcpToolsInfo = null;
+                    if (!alreadySelectingGoal) {
+                        enqueueStarterPrompt();
+                    }
+                    waitingForConfirm = false;
+                    confirmed = false;
                     currentTool = null;
                 } else if (nextStep == NextStep.DONE) {
                     conversationHistory.addMessage("agent", this.toolDecision.toRawMap());
@@ -175,7 +179,11 @@ public class AgentGoalWorkflowImpl implements AgentGoalWorkflow {
     @Override
     public void selectGoal(AgentGoal goal) {
         Workflow.getLogger(AgentGoalWorkflowImpl.class).info("Selecting goal {}", goal != null ? goal.getId() : "null");
-        this.goal = goal;
+        this.goal = ensureGoal(goal);
+        this.mcpToolsInfo = null;
+        if (this.goal.getMcpServerDefinition() != null) {
+            this.mcpToolsInfo = llmActivities.listMcpTools(this.goal.getMcpServerDefinition(), this.goal.getMcpServerDefinition().getIncludedTools());
+        }
         enqueueStarterPrompt();
     }
 
@@ -206,9 +214,19 @@ public class AgentGoalWorkflowImpl implements AgentGoalWorkflow {
     }
 
     private void enqueueStarterPrompt() {
-        if (goal != null && goal.getStarterPrompt() != null && !goal.getStarterPrompt().isBlank()) {
-            promptQueue.add(goal.getStarterPrompt());
+        if (goal == null) {
+            return;
         }
+
+        String starterPrompt = goal.getStarterPrompt();
+        if (starterPrompt == null || starterPrompt.isBlank()) {
+            return;
+        }
+
+        String sanitizedPrompt = starterPrompt.startsWith("###")
+                ? starterPrompt
+                : "### " + starterPrompt.trim();
+        promptQueue.add(sanitizedPrompt);
     }
 
     private boolean isUserPrompt(String prompt) {
@@ -227,6 +245,36 @@ public class AgentGoalWorkflowImpl implements AgentGoalWorkflow {
         conversationHistory.addMessage("tool_result", result);
         promptQueue.add(AgentPromptGenerator.generateToolCompletionPrompt(currentTool, result));
         return false;
+    }
+
+    private AgentGoal ensureGoal(AgentGoal candidate) {
+        return candidate != null ? candidate : createGoalSelectionGoal();
+    }
+
+    private boolean isGoalSelection(AgentGoal candidate) {
+        return candidate != null && "goal_choose_agent_type".equals(candidate.getId());
+    }
+
+    private AgentGoal createGoalSelectionGoal() {
+        AgentGoal selection = new AgentGoal();
+        selection.setId("goal_choose_agent_type");
+        selection.setCategoryTag("core");
+        selection.setAgentName("Select Agent Type");
+        selection.setAgentFriendlyDescription("Help the user choose which agent to interact with.");
+        selection.setDescription(String.join(" ",
+                "Act as an agent concierge who learns what the user wants to achieve and pairs them with the best catalog goal.",
+                "Ask about their objective, timing, and any constraints, then recommend the most relevant agent.",
+                "Offer to switch them into that agent once they agree.",
+                "Keep your tone warm, concise, and focused on moving them forward."));
+        selection.setStarterPrompt(String.join(" ",
+                "Warmly welcome the user, explain that you can match them with the right assistant from our catalog,",
+                "and ask them to share what they need help accomplishing."));
+        selection.setExampleConversationHistory(String.join("\n",
+                "user: I want help tracking an order",
+                "agent: Happy to help! I can bring in our order tracking assistant. Are you trying to check a specific order?",
+                "user: Yes, order 102.",
+                "agent: Perfect. I'll hand things off to the order status assistant so we can look that up together."));
+        return selection;
     }
 
     private List<String> findMissingArgs(Map<String, Object> args) {
