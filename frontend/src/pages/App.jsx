@@ -21,6 +21,8 @@ export default function App() {
     const containerRef = useRef(null);
     const inputRef = useRef(null);
     const pollingRef = useRef(null);
+    const pendingWorkflowRef = useRef(null);
+    const startVersionRef = useRef(0);
     const scrollTimeoutRef = useRef(null);
 
     const [workflowId, setWorkflowId] = useStoredWorkflowId();
@@ -29,15 +31,34 @@ export default function App() {
     const [userInput, setUserInput] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(INITIAL_ERROR_STATE);
-    const [done, setDone] = useState(true);
+    const [done, setDone] = useState(false);
     const errorTimerRef = useRef(null);
 
-    const startNewWorkflow = useCallback(async () => {
-        const data = await apiService.startWorkflow();
-        if (data?.workflowId) {
-            setWorkflowId(data.workflowId);
+    const startNewWorkflow = useCallback(async ({ goalId, force = false } = {}) => {
+        if (pendingWorkflowRef.current && !force) {
+            return pendingWorkflowRef.current;
         }
-        return data?.workflowId ?? null;
+
+        const version = ++startVersionRef.current;
+        const startPromise = (async () => {
+            const data = await apiService.startWorkflow(goalId);
+            const newWorkflowId = data?.workflowId ?? null;
+
+            if (startVersionRef.current === version) {
+                setWorkflowId(newWorkflowId);
+            }
+
+            return newWorkflowId;
+        })();
+
+        const trackedPromise = startPromise.finally(() => {
+            if (pendingWorkflowRef.current === trackedPromise) {
+                pendingWorkflowRef.current = null;
+            }
+        });
+
+        pendingWorkflowRef.current = trackedPromise;
+        return trackedPromise;
     }, [setWorkflowId]);
 
     const ensureWorkflow = useCallback(async () => {
@@ -51,8 +72,8 @@ export default function App() {
         setWorkflowId(null);
         setConversation([]);
         setLastMessage(null);
-        setDone(true);
-        return await startNewWorkflow();
+        setDone(false);
+        return await startNewWorkflow({ force: true });
     }, [setWorkflowId, startNewWorkflow]);
 
     const handleError = useCallback((err, context) => {
@@ -119,7 +140,7 @@ export default function App() {
                 );
             } else {
                 setLoading(false);
-                setDone(true);
+                setDone(false);
                 setLastMessage(null);
             }
 

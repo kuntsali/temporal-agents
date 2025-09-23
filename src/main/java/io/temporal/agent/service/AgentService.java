@@ -30,7 +30,7 @@ public class AgentService {
     }
 
     public String startConversation(String workflowId, String goalId) {
-        AgentGoal goal = resolveGoal(goalId);
+        AgentGoal goal = resolveInitialGoal(goalId);
         AgentGoalWorkflowParams params = new AgentGoalWorkflowParams();
         CombinedInput input = new CombinedInput(params, goal);
 
@@ -86,14 +86,22 @@ public class AgentService {
     }
 
     private AgentGoal resolveGoal(String goalId) {
-        if (goalId == null || goalId.isBlank()) {
-            return Optional.ofNullable(goalRegistry.listGoals().stream().findFirst().orElse(null))
-                    .orElseThrow(() -> new IllegalArgumentException("No goals configured"));
-        }
         AgentGoal goal = goalRegistry.findGoal(goalId);
         if (goal == null) {
             throw new IllegalArgumentException("Unknown goal: " + goalId);
         }
         return goal;
+    }
+
+    private AgentGoal resolveInitialGoal(String goalId) {
+        if (goalId == null || goalId.isBlank()) {
+            AgentGoal selectionGoal = goalRegistry.findGoal("goal_choose_agent_type");
+            if (selectionGoal != null) {
+                return selectionGoal;
+            }
+            return Optional.ofNullable(goalRegistry.listGoals().stream().findFirst().orElse(null))
+                    .orElseThrow(() -> new IllegalStateException("No goals configured"));
+        }
+        return resolveGoal(goalId);
     }
 }
