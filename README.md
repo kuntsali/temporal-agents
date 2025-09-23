@@ -50,7 +50,7 @@ All configuration lives in `src/main/resources/application.yml` and environment 
    ./gradlew bootRun
    ```
 
-The worker registers the workflow and activities and begins polling the configured task queue. The REST API is available on `http://localhost:8080`.
+The worker registers the workflow and activities and begins polling the configured task queue. The REST API is available on `http://localhost:8080` and the chat UI is served from the same port.
 
 4. Start the web chat (optional but recommended):
    ```bash
